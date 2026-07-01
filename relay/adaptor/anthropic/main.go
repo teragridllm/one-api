@@ -246,7 +246,15 @@ func ResponseClaude2OpenAI(claudeResponse *Response) *openai.TextResponse {
 	return &fullTextResponse
 }
 
-func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+func StreamHandler(c *gin.Context, resp *http.Response, modelNames ...string) (*model.ErrorWithStatusCode, *model.Usage) {
+	if strings.HasPrefix(c.Request.URL.Path, "/v1/messages") {
+		name := ""
+		if len(modelNames) > 0 {
+			name = modelNames[0]
+		}
+		return rawStreamHandler(c, resp, name)
+	}
+
 	createdTime := helper.GetTimestamp()
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -335,6 +343,82 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 	return nil, &usage
 }
 
+func rawStreamHandler(c *gin.Context, resp *http.Response, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+	for k, v := range resp.Header {
+		c.Writer.Header().Set(k, v[0])
+	}
+	c.Writer.WriteHeader(resp.StatusCode)
+
+	scanner := bufio.NewScanner(resp.Body)
+	usage := &model.Usage{}
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "data:") {
+			rewrittenLine := rewriteRawStreamDataLine(line, modelName, usage)
+			_, err := c.Writer.Write([]byte(rewrittenLine + "\n"))
+			if err != nil {
+				return openai.ErrorWrapper(err, "copy_response_body_failed", http.StatusInternalServerError), nil
+			}
+		} else {
+			_, err := c.Writer.Write([]byte(line + "\n"))
+			if err != nil {
+				return openai.ErrorWrapper(err, "copy_response_body_failed", http.StatusInternalServerError), nil
+			}
+		}
+		c.Writer.Flush()
+	}
+	if err := scanner.Err(); err != nil {
+		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
+	}
+	err := resp.Body.Close()
+	if err != nil {
+		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
+	}
+	return nil, usage
+}
+
+func rewriteRawStreamDataLine(line string, modelName string, usage *model.Usage) string {
+	data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	if data == "" {
+		return line
+	}
+	var response map[string]any
+	err := json.Unmarshal([]byte(data), &response)
+	if err != nil {
+		return line
+	}
+	if message, ok := response["message"].(map[string]any); ok {
+		if modelName != "" {
+			message["model"] = modelName
+		}
+		addRawStreamUsage(usage, message["usage"])
+	}
+	addRawStreamUsage(usage, response["usage"])
+	rewrittenData, err := json.Marshal(response)
+	if err != nil {
+		return line
+	}
+	return "data: " + string(rewrittenData)
+}
+
+func addRawStreamUsage(usage *model.Usage, rawUsage any) {
+	usageMap, ok := rawUsage.(map[string]any)
+	if !ok {
+		return
+	}
+	usage.PromptTokens += intFromRawUsage(usageMap["input_tokens"])
+	usage.CompletionTokens += intFromRawUsage(usageMap["output_tokens"])
+	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+}
+
+func intFromRawUsage(value any) int {
+	number, ok := value.(float64)
+	if !ok {
+		return 0
+	}
+	return int(number)
+}
+
 func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -359,6 +443,22 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
+	}
+	if strings.HasPrefix(c.Request.URL.Path, "/v1/messages") {
+		claudeResponse.Model = modelName
+		jsonResponse, err := json.Marshal(claudeResponse)
+		if err != nil {
+			return openai.ErrorWrapper(err, "marshal_response_body_failed", http.StatusInternalServerError), nil
+		}
+		usage := model.Usage{
+			PromptTokens:     claudeResponse.Usage.InputTokens,
+			CompletionTokens: claudeResponse.Usage.OutputTokens,
+			TotalTokens:      claudeResponse.Usage.InputTokens + claudeResponse.Usage.OutputTokens,
+		}
+		c.Writer.Header().Set("Content-Type", "application/json")
+		c.Writer.WriteHeader(resp.StatusCode)
+		_, err = c.Writer.Write(jsonResponse)
+		return nil, &usage
 	}
 	fullTextResponse := ResponseClaude2OpenAI(&claudeResponse)
 	fullTextResponse.Model = modelName

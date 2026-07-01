@@ -61,6 +61,15 @@ const typeConfig = {
     },
     modelGroup: 'anthropic'
   },
+  52: {
+    inputLabel: {
+      base_url: 'Base URL'
+    },
+    prompt: {
+      base_url: '请填写 Anthropic SDK 中所要求的 Base URL，例如：https://api.anthropic.com/v1'
+    },
+    modelGroup: 'anthropic'
+  },
   15: {
     input: {
       models: ['ERNIE-Bot', 'ERNIE-Bot-turbo', 'ERNIE-Bot-4', 'Embedding-V1']

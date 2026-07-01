@@ -48,7 +48,7 @@ const validationSchema = Yup.object().shape({
   models: Yup.array().min(1, '模型 不能为空'),
   groups: Yup.array().min(1, '用户组 不能为空'),
   base_url: Yup.string().when('type', {
-    is: (value) => [3, 8].includes(value),
+    is: (value) => [3, 8, 52].includes(value),
     then: Yup.string().required('渠道API地址 不能为空'), // base_url 是必需的
     otherwise: Yup.string() // 在其他情况下，base_url 可以是任意字符串
   }),

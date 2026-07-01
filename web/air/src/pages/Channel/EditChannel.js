@@ -377,6 +377,24 @@ const EditChannel = (props) => {
                         </>
                       )
                     }
+                    {
+                      inputs.type === 52 && (
+                        <>
+                            <div style={{ marginTop: 10 }}>
+                                <Typography.Text strong>Base URL：</Typography.Text>
+                            </div>
+                            <Input
+                              name='base_url'
+                              placeholder={'请输入 Anthropic SDK 中所要求的 Base URL，例如：https://api.anthropic.com/v1'}
+                              onChange={value => {
+                                  handleInputChange('base_url', value)
+                              }}
+                              value={inputs.base_url}
+                              autoComplete='new-password'
+                            />
+                        </>
+                      )
+                    }
                     <div style={{ marginTop: 10 }}>
                         <Typography.Text strong>名称：</Typography.Text>
                     </div>
@@ -596,7 +614,7 @@ const EditChannel = (props) => {
                       )
                     }
                     {
-                      inputs.type !== 3 && inputs.type !== 8 && inputs.type !== 22 && (
+                      inputs.type !== 3 && inputs.type !== 8 && inputs.type !== 22 && inputs.type !== 52 && (
                         <>
                             <div style={{ marginTop: 10 }}>
                                 <Typography.Text strong>代理：</Typography.Text>

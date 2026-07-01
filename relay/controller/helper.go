@@ -17,6 +17,7 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
+	"github.com/songquanpeng/one-api/relay/adaptor/anthropic"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	billingratio "github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/channeltype"
@@ -28,9 +29,23 @@ import (
 
 func getAndValidateTextRequest(c *gin.Context, relayMode int) (*relaymodel.GeneralOpenAIRequest, error) {
 	textRequest := &relaymodel.GeneralOpenAIRequest{}
-	err := common.UnmarshalBodyReusable(c, textRequest)
-	if err != nil {
-		return nil, err
+	var err error
+	if relayMode == relaymode.AnthropicMessages {
+		anthropicRequest := anthropic.InboundRequest{}
+		err = common.UnmarshalBodyReusable(c, &anthropicRequest)
+		if err != nil {
+			return nil, err
+		}
+		textRequest, err = anthropic.ConvertInboundRequest(anthropicRequest)
+		if err != nil {
+			return nil, err
+		}
+		relayMode = relaymode.ChatCompletions
+	} else {
+		err = common.UnmarshalBodyReusable(c, textRequest)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if relayMode == relaymode.Moderations && textRequest.Model == "" {
 		textRequest.Model = "text-moderation-latest"
@@ -48,6 +63,8 @@ func getAndValidateTextRequest(c *gin.Context, relayMode int) (*relaymodel.Gener
 func getPromptTokens(textRequest *relaymodel.GeneralOpenAIRequest, relayMode int) int {
 	switch relayMode {
 	case relaymode.ChatCompletions:
+		return openai.CountTokenMessages(textRequest.Messages, textRequest.Model)
+	case relaymode.AnthropicMessages:
 		return openai.CountTokenMessages(textRequest.Messages, textRequest.Model)
 	case relaymode.Completions:
 		return openai.CountTokenInput(textRequest.Prompt, textRequest.Model)

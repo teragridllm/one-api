@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/relay/adaptor"
+	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 )
@@ -21,12 +22,19 @@ func (a *Adaptor) Init(meta *meta.Meta) {
 }
 
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
+	if meta.ChannelType == channeltype.AnthropicCompatible {
+		return fmt.Sprintf("%s/v1/messages", strings.TrimSuffix(meta.BaseURL, "/")), nil
+	}
 	return fmt.Sprintf("%s/v1/messages", meta.BaseURL), nil
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) error {
 	adaptor.SetupCommonRequestHeader(c, req, meta)
-	req.Header.Set("x-api-key", meta.APIKey)
+	if meta.ChannelType == channeltype.AnthropicCompatible {
+		req.Header.Set("Authorization", "Bearer "+meta.APIKey)
+	} else {
+		req.Header.Set("x-api-key", meta.APIKey)
+	}
 	anthropicVersion := c.Request.Header.Get("anthropic-version")
 	if anthropicVersion == "" {
 		anthropicVersion = "2023-06-01"
@@ -62,10 +70,14 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+	modelName := meta.ActualModelName
+	if strings.HasPrefix(c.Request.URL.Path, "/v1/messages") {
+		modelName = meta.OriginModelName
+	}
 	if meta.IsStream {
-		err, usage = StreamHandler(c, resp)
+		err, usage = StreamHandler(c, resp, modelName)
 	} else {
-		err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		err, usage = Handler(c, resp, meta.PromptTokens, modelName)
 	}
 	return
 }

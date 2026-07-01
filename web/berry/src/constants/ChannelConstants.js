@@ -11,6 +11,12 @@ export const CHANNEL_OPTIONS = {
     value: 14,
     color: 'primary'
   },
+  52: {
+    key: 52,
+    text: 'Anthropic 兼容',
+    value: 52,
+    color: 'primary'
+  },
   33: {
     key: 33,
     text: 'AWS',

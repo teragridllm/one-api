@@ -1,6 +1,7 @@
 export const CHANNEL_OPTIONS = [
   { key: 1, text: 'OpenAI', value: 1, color: 'green' },
   { key: 14, text: 'Anthropic Claude', value: 14, color: 'black' },
+  { key: 52, text: 'Anthropic 兼容', value: 52, color: 'black' },
   { key: 33, text: 'AWS', value: 33, color: 'black' },
   { key: 3, text: 'Azure OpenAI', value: 3, color: 'olive' },
   { key: 11, text: 'Google PaLM2', value: 11, color: 'orange' },

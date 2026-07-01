@@ -21,6 +21,7 @@ func SetRelayRouter(router *gin.Engine) {
 	relayV1Router.Use(middleware.RelayPanicRecover(), middleware.TokenAuth(), middleware.Distribute())
 	{
 		relayV1Router.Any("/oneapi/proxy/:channelid/*target", controller.Relay)
+		relayV1Router.POST("/messages", controller.Relay)
 		relayV1Router.POST("/completions", controller.Relay)
 		relayV1Router.POST("/chat/completions", controller.Relay)
 		relayV1Router.POST("/edits", controller.Relay)

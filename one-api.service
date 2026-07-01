@@ -1,18 +1,17 @@
-# File path: /etc/systemd/system/one-api.service
-# sudo systemctl daemon-reload
-# sudo systemctl start one-api
-# sudo systemctl enable one-api
-# sudo systemctl status one-api
 [Unit]
 Description=One API Service
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
-User=ubuntu  # 注意修改用户名
-WorkingDirectory=/path/to/one-api  # 注意修改路径
-ExecStart=/path/to/one-api/one-api --port 3000 --log-dir /path/to/one-api/logs  # 注意修改路径和端口号
+Type=simple
+User=onehao
+WorkingDirectory=/home/onehao/workspace/fastgpt/one-api
+ExecStart=/home/onehao/workspace/fastgpt/one-api/one-api --port 1981 --log-dir /home/onehao/workspace/fastgpt/one-api/logs
 Restart=always
 RestartSec=5
+StandardOutput=append:/home/onehao/workspace/fastgpt/one-api/output.log
+StandardError=append:/home/onehao/workspace/fastgpt/one-api/output.log
 
 [Install]
 WantedBy=multi-user.target

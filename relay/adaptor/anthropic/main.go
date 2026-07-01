@@ -89,8 +89,8 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 		claudeRequest.Model = "claude-2.1"
 	}
 	for _, message := range textRequest.Messages {
-		if message.Role == "system" && claudeRequest.System == "" {
-			claudeRequest.System = message.StringContent()
+		if message.Role == "system" {
+			claudeRequest.System = appendSystemPrompt(claudeRequest.System, message.StringContent())
 			continue
 		}
 		claudeMessage := Message{
@@ -108,17 +108,8 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 				content.ToolUseId = message.ToolCallId
 			}
 			claudeMessage.Content = append(claudeMessage.Content, content)
-			for i := range message.ToolCalls {
-				inputParam := make(map[string]any)
-				_ = json.Unmarshal([]byte(message.ToolCalls[i].Function.Arguments.(string)), &inputParam)
-				claudeMessage.Content = append(claudeMessage.Content, Content{
-					Type:  "tool_use",
-					Id:    message.ToolCalls[i].Id,
-					Name:  message.ToolCalls[i].Function.Name,
-					Input: inputParam,
-				})
-			}
-			claudeRequest.Messages = append(claudeRequest.Messages, claudeMessage)
+			claudeMessage.Content = appendToolCallContent(claudeMessage.Content, message.ToolCalls)
+			claudeRequest.Messages = appendClaudeMessage(claudeRequest.Messages, claudeMessage)
 			continue
 		}
 		var contents []Content
@@ -128,6 +119,7 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 			if part.Type == model.ContentTypeText {
 				content.Type = "text"
 				content.Text = part.Text
+				contents = append(contents, content)
 			} else if part.Type == model.ContentTypeImageURL {
 				content.Type = "image"
 				content.Source = &ImageSource{
@@ -136,11 +128,11 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *Request {
 				mimeType, data, _ := image.GetImageFromUrl(part.ImageURL.Url)
 				content.Source.MediaType = mimeType
 				content.Source.Data = data
+				contents = append(contents, content)
 			}
-			contents = append(contents, content)
 		}
-		claudeMessage.Content = contents
-		claudeRequest.Messages = append(claudeRequest.Messages, claudeMessage)
+		claudeMessage.Content = appendToolCallContent(contents, message.ToolCalls)
+		claudeRequest.Messages = appendClaudeMessage(claudeRequest.Messages, claudeMessage)
 	}
 	return &claudeRequest
 }

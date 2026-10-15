@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useContext, useEffect } from 'react';
+import React, { lazy, Suspense, useContext, useEffect, useRef } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import Loading from './components/Loading';
 import User from './pages/User';
@@ -33,6 +33,30 @@ const About = lazy(() => import('./pages/About'));
 function App() {
   const [userState, userDispatch] = useContext(UserContext);
   const [statusState, statusDispatch] = useContext(StatusContext);
+  const previousUserId = useRef();
+
+  useEffect(() => {
+    const userId = userState.user?.id;
+    const noticeKey = 'version_notice';
+    if (!userId) {
+      if (previousUserId.current) {
+        sessionStorage.removeItem(noticeKey);
+      }
+      previousUserId.current = undefined;
+      return;
+    }
+    previousUserId.current = userId;
+    const serverVersion = statusState.status?.version;
+    const clientVersion = process.env.REACT_APP_VERSION;
+    if (!clientVersion || !serverVersion || serverVersion === 'v0.0.0' || serverVersion === clientVersion) {
+      return;
+    }
+    const notice = JSON.stringify([userId, serverVersion]);
+    if (sessionStorage.getItem(noticeKey) !== notice) {
+      showNotice(`新版本可用：${serverVersion}，请使用快捷键 Shift + F5 刷新页面`);
+      sessionStorage.setItem(noticeKey, notice);
+    }
+  }, [userState.user?.id, statusState.status?.version]);
 
   const loadUser = () => {
     let user = localStorage.getItem('user');
@@ -58,15 +82,6 @@ function App() {
           localStorage.setItem('chat_link', data.chat_link);
         } else {
           localStorage.removeItem('chat_link');
-        }
-        if (
-          data.version !== process.env.REACT_APP_VERSION &&
-          data.version !== 'v0.0.0' &&
-          process.env.REACT_APP_VERSION !== ''
-        ) {
-          showNotice(
-            `新版本可用：${data.version}，请使用快捷键 Shift + F5 刷新页面`
-          );
         }
       } else {
         showError(message || '无法正常连接至服务器！');

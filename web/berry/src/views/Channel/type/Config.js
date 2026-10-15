@@ -70,6 +70,28 @@ const typeConfig = {
     },
     modelGroup: 'anthropic'
   },
+  53: {
+    inputLabel: {
+      base_url: 'Base URL'
+    },
+    prompt: {
+      base_url: '请填写 OpenCode Go 的 Base URL，例如：https://opencode.ai/inference/go/v1'
+    },
+    modelGroup: 'openai'
+  },
+  54: {
+    inputLabel: {
+      base_url: 'Base URL'
+    },
+    prompt: {
+      base_url: '默认：https://api.commandcode.ai/provider/v1'
+    },
+    input: {
+      base_url: 'https://api.commandcode.ai/provider/v1',
+      models: ['deepseek/deepseek-v4-flash', 'deepseek/deepseek-v4.1-flash']
+    },
+    modelGroup: 'openai'
+  },
   15: {
     input: {
       models: ['ERNIE-Bot', 'ERNIE-Bot-turbo', 'ERNIE-Bot-4', 'Embedding-V1']

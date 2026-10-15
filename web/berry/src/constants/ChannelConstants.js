@@ -1,8 +1,20 @@
 export const CHANNEL_OPTIONS = {
+  54: {
+    key: 54,
+    text: 'CommandCode',
+    value: 54,
+    color: 'success'
+  },
   1: {
     key: 1,
     text: 'OpenAI',
     value: 1,
+    color: 'success'
+  },
+  53: {
+    key: 53,
+    text: 'OpenCode',
+    value: 53,
     color: 'success'
   },
   14: {

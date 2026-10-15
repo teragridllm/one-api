@@ -24,6 +24,7 @@ import (
 )
 
 var CompatibleChannels = []int{
+	channeltype.CommandCode,
 	channeltype.Azure,
 	channeltype.AI360,
 	channeltype.Moonshot,
@@ -45,6 +46,8 @@ var CompatibleChannels = []int{
 
 func GetCompatibleChannelMeta(channelType int) (string, []string) {
 	switch channelType {
+	case channeltype.CommandCode:
+		return "commandcode", []string{"deepseek/deepseek-v4-flash", "deepseek/deepseek-v4.1-flash"}
 	case channeltype.Azure:
 		return "azure", ModelList
 	case channeltype.AI360:

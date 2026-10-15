@@ -54,5 +54,7 @@ const (
 	OpenAICompatible
 	GeminiOpenAICompatible
 	AnthropicCompatible
+	OpenCode
+	CommandCode
 	Dummy
 )

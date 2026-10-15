@@ -126,6 +126,62 @@ _✨ 通过标准的 OpenAI API 格式访问所有的大模型，开箱即用 �
 24. 配合 [Message Pusher](https://github.com/songquanpeng/message-pusher) 可将报警信息推送到多种 App 上。
 
 ## 部署
+### 本机 systemd 启动方式
+当前这台机器使用系统级 systemd 管理 One API，而不是 crontab `@reboot` 或用户级 `systemctl --user` 服务。
+
+生效的服务文件：
+
+```bash
+/etc/systemd/system/one-api.service
+```
+
+项目内保留同内容模板，修改后需要复制到 systemd 目录并重载：
+
+```bash
+/home/onehao/workspace/fastgpt/one-api/one-api.service
+```
+
+安装或更新服务文件：
+
+```bash
+sudo cp /home/onehao/workspace/fastgpt/one-api/one-api.service /etc/systemd/system/one-api.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now one-api
+```
+
+启动命令：
+
+```bash
+/home/onehao/workspace/fastgpt/one-api/one-api --port 1981 --log-dir /home/onehao/workspace/fastgpt/one-api/logs
+```
+
+常用管理命令：
+
+```bash
+sudo systemctl status one-api
+sudo systemctl restart one-api
+sudo systemctl stop one-api
+sudo systemctl enable one-api
+sudo systemctl disable one-api
+journalctl -u one-api -f
+```
+
+当前预期状态：
+
+```text
+Loaded: loaded (/etc/systemd/system/one-api.service; enabled)
+Active: active (running)
+CGroup: /system.slice/one-api.service
+```
+
+之前的 crontab 自启项已移除。那条旧配置会在重启后执行 `./start-server.sh`，但当前项目没有该脚本，导致自启失败并在 `output.log` 中记录 `cannot open ./start-server.sh`。
+
+之前临时使用过的用户级服务也已停用：
+
+```bash
+systemctl --user disable --now one-api
+```
+
 ### 基于 Docker 进行部署
 ```shell
 # 使用 SQLite 的部署命令：
@@ -415,6 +471,33 @@ graph LR
 28. `INITIAL_ROOT_ACCESS_TOKEN`：如果设置了该值，则在系统首次启动时会自动创建一个值为该环境变量的 root 用户创建系统管理令牌。
 29. `ENFORCE_INCLUDE_USAGE`：是否强制在 stream 模型下返回 usage，默认不开启，可选值为 `true` 和 `false`。
 30. `TEST_PROMPT`：测试模型时的用户 prompt，默认为 `Print your model name exactly and do not output without any other text.`。
+
+### CommandCode 渠道
+
+在渠道管理中选择 **CommandCode**（类型 `54`），填写 API Key 和模型名称。Base URL 留空时使用
+`https://api.commandcode.ai/provider/v1`；自定义地址也应填写到 API 根路径，无需追加 `/chat/completions`。
+内置模型选项为 `deepseek/deepseek-v4-flash` 和 `deepseek/deepseek-v4.1-flash`，可按账户权限增减或设置模型映射。
+
+该类型使用独立的 HTTP/1.1 连接池，等待响应头最多 45 秒。环境变量
+`COMMANDCODE_RESPONSE_IDLE_TIMEOUT` 控制单次读取响应数据的等待上限，单位为秒，默认 `300`；
+设为 `0` 可关闭该空闲超时，负数使用默认值。修改 `.env` 后需重启服务。
+它同时遵守 `RELAY_PROXY` 和 `RELAY_TIMEOUT` 设置；关闭空闲超时不会关闭请求取消或全局总超时。
+超时错误会包含等待上限及已读取的响应字节数。HTTP/1.1 用于规避已观察到的 HTTP/2 协议错误，
+不能保证消除上游网络重置或超时。
+
+并行任务可同时调用。若 TLS 握手超时，且尚未取得连接或发送 HTTP 请求，则等待 100 毫秒后
+自动重连一次；两次尝试及响应读取共享 `RELAY_TIMEOUT` 总时限。已发送请求、上游 HTTP 错误、
+响应头超时或流中断不会触发这次重试，以免重复提交模型任务。
+
+模型映射和系统提示词覆盖会保留请求中的扩展字段，包括 reasoning、thinking 和工具参数。
+流式请求强制请求 usage；只有收到各 choice 的结束原因、usage 和 `[DONE]` 才视为正常完成。
+正常完成后会在最多 1 秒、64 KiB 的范围内继续读取 HTTP 响应尾部，以便复用连接、减少重复 TLS 握手。
+该清理过程遵守客户端取消；清理失败不会把已经完成的模型回答改判为失败。
+上游错误、流中断或缺失结束事件会返回错误，退还预扣额度；已输出数据后通过 SSE 错误事件结束，
+不再由网关自动重试。客户端可据此决定是否重新发起完整模型调用。
+需要 CommandCode 零数据保留选项时，可传入 `x-cmd-zdr` 请求头，网关会透传给该渠道。
+
+已有通用兼容渠道不会自动转换。部署此版本后，在渠道编辑页将对应渠道类型改为 CommandCode 才会启用以上逻辑。
 
 ### 命令行参数
 1. `--port <port_number>`: 指定服务器监听的端口号，默认为 `3000`。

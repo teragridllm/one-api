@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/alibailian"
 	"github.com/songquanpeng/one-api/relay/adaptor/baiduv2"
@@ -69,6 +70,18 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) error {
 	adaptor.SetupCommonRequestHeader(c, req, meta)
+	if meta.ChannelType == channeltype.CommandCode {
+		if zdr := c.Request.Header.Get("x-cmd-zdr"); zdr != "" {
+			req.Header.Set("x-cmd-zdr", zdr)
+		}
+	}
+	if meta.ChannelType == channeltype.OpenCode {
+		sessionID := c.Request.Header.Get("x-opencode-session")
+		if sessionID == "" {
+			sessionID = random.GetUUID()
+		}
+		req.Header.Set("x-opencode-session", sessionID)
+	}
 	if meta.ChannelType == channeltype.Azure {
 		req.Header.Set("api-key", meta.APIKey)
 		return nil
@@ -84,6 +97,20 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.GeneralOpenAIRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
+	}
+	if a.ChannelType == channeltype.OpenCode && len(request.Tools) > 0 {
+		for i := range request.Messages {
+			message := &request.Messages[i]
+			if message.Role != "assistant" {
+				continue
+			}
+			if message.ReasoningContent == nil {
+				message.ReasoningContent = ""
+			}
+			if message.Content == nil && len(message.ToolCalls) == 0 {
+				message.Content = ""
+			}
+		}
 	}
 	if request.Stream {
 		// always return usage in stream mode
@@ -103,13 +130,23 @@ func (a *Adaptor) ConvertImageRequest(request *model.ImageRequest) (any, error) 
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Reader) (*http.Response, error) {
+	if meta.ChannelType == channeltype.CommandCode {
+		return a.doCommandCodeRequest(c, meta, requestBody)
+	}
 	return adaptor.DoRequestHelper(a, c, meta, requestBody)
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if meta.IsStream {
 		var responseText string
-		err, responseText, usage = StreamHandler(c, resp, meta.Mode)
+		if meta.ChannelType == channeltype.CommandCode {
+			err, responseText, usage = commandCodeStreamHandler(c, resp, meta.Mode)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			err, responseText, usage = StreamHandler(c, resp, meta.Mode)
+		}
 		if usage == nil || usage.TotalTokens == 0 {
 			usage = ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
 		}

@@ -62,12 +62,18 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 	// get request body
 	requestBody, err := getRequestBody(c, meta, textRequest, adaptor)
 	if err != nil {
+		if meta.ChannelType == channeltype.CommandCode {
+			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+		}
 		return openai.ErrorWrapper(err, "convert_request_failed", http.StatusInternalServerError)
 	}
 
 	// do request
 	resp, err := adaptor.DoRequest(c, meta, requestBody)
 	if err != nil {
+		if meta.ChannelType == channeltype.CommandCode {
+			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+		}
 		logger.Errorf(ctx, "DoRequest failed: %s", err.Error())
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
@@ -89,11 +95,15 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 }
 
 func getRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model.GeneralOpenAIRequest, adaptor adaptor.Adaptor) (io.Reader, error) {
+	if meta.ChannelType == channeltype.CommandCode {
+		return commandCodeRequestBody(c, meta, textRequest)
+	}
 	if !config.EnforceIncludeUsage &&
 		meta.APIType == apitype.OpenAI &&
 		meta.Mode != relaymode.AnthropicMessages &&
 		meta.OriginModelName == meta.ActualModelName &&
 		meta.ChannelType != channeltype.Baichuan &&
+		meta.ChannelType != channeltype.OpenCode &&
 		meta.ForcedSystemPrompt == "" {
 		// no need to convert request for openai
 		return c.Request.Body, nil

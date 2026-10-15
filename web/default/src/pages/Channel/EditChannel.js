@@ -349,16 +349,20 @@ const EditChannel = () => {
                 />
               </Form.Field>
             )}
-            {[50, 52].includes(inputs.type) && (
+            {[50, 52, 53, 54].includes(inputs.type) && (
                 <Form.Field>
                   <Form.Input
-                      required
+                      required={inputs.type !== 54}
                   label={t('channel.edit.base_url')}
                   name='base_url'
                   placeholder={
                     inputs.type === 52
                       ? t('channel.edit.anthropic_base_url_placeholder')
-                      : t('channel.edit.base_url_placeholder')
+                      : inputs.type === 53
+                        ? t('channel.edit.opencode_base_url_placeholder')
+                        : inputs.type === 54
+                          ? 'https://api.commandcode.ai/provider/v1'
+                        : t('channel.edit.base_url_placeholder')
                   }
                   onChange={handleInputChange}
                   value={inputs.base_url}
@@ -657,6 +661,8 @@ const EditChannel = () => {
               inputs.type !== 8 &&
                 inputs.type !== 50 &&
               inputs.type !== 52 &&
+              inputs.type !== 53 &&
+              inputs.type !== 54 &&
               inputs.type !== 22 && (
                 <Form.Field>
                   <Form.Input

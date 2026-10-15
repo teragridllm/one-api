@@ -378,14 +378,20 @@ const EditChannel = (props) => {
                       )
                     }
                     {
-                      inputs.type === 52 && (
+                      [52, 53, 54].includes(inputs.type) && (
                         <>
                             <div style={{ marginTop: 10 }}>
                                 <Typography.Text strong>Base URL：</Typography.Text>
                             </div>
                             <Input
                               name='base_url'
-                              placeholder={'请输入 Anthropic SDK 中所要求的 Base URL，例如：https://api.anthropic.com/v1'}
+                              placeholder={
+                                  inputs.type === 53
+                                    ? '请输入 OpenCode Go 的 Base URL，例如：https://opencode.ai/inference/go/v1'
+                                    : inputs.type === 54
+                                      ? 'https://api.commandcode.ai/provider/v1'
+                                    : '请输入 Anthropic SDK 中所要求的 Base URL，例如：https://api.anthropic.com/v1'
+                              }
                               onChange={value => {
                                   handleInputChange('base_url', value)
                               }}
@@ -614,7 +620,7 @@ const EditChannel = (props) => {
                       )
                     }
                     {
-                      inputs.type !== 3 && inputs.type !== 8 && inputs.type !== 22 && inputs.type !== 52 && (
+                      inputs.type !== 3 && inputs.type !== 8 && inputs.type !== 22 && inputs.type !== 52 && inputs.type !== 53 && inputs.type !== 54 && (
                         <>
                             <div style={{ marginTop: 10 }}>
                                 <Typography.Text strong>代理：</Typography.Text>

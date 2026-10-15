@@ -109,6 +109,7 @@
       "base_url": "Base URL",
       "base_url_placeholder": "OpenAPI SDK 中所要求的 Base URL",
       "anthropic_base_url_placeholder": "Anthropic SDK 中所要求的 Base URL，例如：https://api.anthropic.com/v1",
+      "opencode_base_url_placeholder": "OpenCode Go 的 Base URL，例如：https://opencode.ai/inference/go/v1",
       "key": "密钥",
       "key_placeholder": "请输入密钥",
       "batch": "批量创建",

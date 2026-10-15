@@ -7,6 +7,20 @@ export const CHANNEL_OPTIONS = [
     color: 'olive',
     description: 'OpenAI 兼容渠道，支持设置 Base URL',
   },
+  {
+    key: 53,
+    text: 'OpenCode',
+    value: 53,
+    color: 'olive',
+    description: 'OpenCode Go 渠道，支持设置 Base URL',
+  },
+  {
+    key: 54,
+    text: 'CommandCode',
+    value: 54,
+    color: 'olive',
+    description: 'CommandCode Provider API',
+  },
   {key: 14, text: 'Anthropic', value: 14, color: 'black'},
   {
     key: 52,

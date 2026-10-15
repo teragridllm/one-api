@@ -109,6 +109,7 @@
       "base_url": "Base URL",
       "base_url_placeholder": "The Base URL required by the OpenAPI SDK",
       "anthropic_base_url_placeholder": "The Base URL required by the Anthropic SDK, e.g. https://api.anthropic.com/v1",
+      "opencode_base_url_placeholder": "The OpenCode Go Base URL, e.g. https://opencode.ai/inference/go/v1",
       "key": "Key",
       "key_placeholder": "Please enter key",
       "batch": "Batch Create",

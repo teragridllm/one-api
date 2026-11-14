@@ -51,3 +51,36 @@ class ExceptionTest(unittest.TestCase):
     def test_hierarchy(self):
         self.assertTrue(issubclass(U.UsageError, U.OneApiError))
         self.assertTrue(issubclass(U.NetworkError, U.OneApiError))
+
+
+import datetime
+
+
+def _stat(day, model, tokens_p, tokens_c, reqs):
+    return {"Day": day, "ModelName": model,
+            "PromptTokens": tokens_p, "CompletionTokens": tokens_c,
+            "RequestCount": reqs, "Quota": 0}
+
+
+class DayAggregateTest(unittest.TestCase):
+    def test_last_n_days_length_and_order(self):
+        today = datetime.date(2026, 11, 14)
+        days = U.last_n_days(today=today, n=7)
+        self.assertEqual(len(days), 7)
+        self.assertEqual(days[0], "2026-11-08")
+        self.assertEqual(days[-1], "2026-11-14")
+
+    def test_fills_missing_days_with_zero(self):
+        days = ["2026-11-08", "2026-11-09", "2026-11-10"]
+        stats = [_stat("2026-11-08", "gpt-4o", 100, 50, 2),
+                 _stat("2026-11-10", "gpt-4o", 1, 1, 1)]
+        daily = U.aggregate_by_day(stats, days)
+        self.assertEqual([d.day for d in daily], days)
+        self.assertEqual(daily[1].tokens, 0)         # 2026-11-09 absent -> 0
+        self.assertEqual(daily[0].tokens, 150)       # 100 + 50
+        self.assertEqual(daily[2].requests, 1)
+
+    def test_total_and_today(self):
+        stats = [_stat("2026-11-14", "a", 10, 5, 1), _stat("2026-11-13", "a", 7, 3, 2)]
+        self.assertEqual(U.total_tokens(stats), 25)
+        self.assertEqual(U.today_total(stats, today=datetime.date(2026, 11, 14)), 15)

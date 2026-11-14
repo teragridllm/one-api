@@ -62,3 +62,42 @@ def load_config(path=CONFIG_PATH, environ=None):
 def save_config(config, path=CONFIG_PATH):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+import datetime
+from dataclasses import dataclass
+
+
+@dataclass
+class DayStat:
+    day: str
+    tokens: int
+    requests: int
+
+
+def last_n_days(today=None, n=7):
+    today = today or datetime.date.today()
+    return [(today - datetime.timedelta(days=i)).isoformat() for i in range(n - 1, -1, -1)]
+
+
+def aggregate_by_day(stats, days):
+    tokens = {d: 0 for d in days}
+    reqs = {d: 0 for d in days}
+    for s in stats:
+        d = s.get("Day")
+        if d in tokens:
+            tokens[d] += int(s.get("PromptTokens", 0)) + int(s.get("CompletionTokens", 0))
+            reqs[d] += int(s.get("RequestCount", 0))
+    return [DayStat(d, tokens[d], reqs[d]) for d in days]
+
+
+def total_tokens(stats):
+    return sum(int(s.get("PromptTokens", 0)) + int(s.get("CompletionTokens", 0)) for s in stats)
+
+
+def today_total(stats, today=None):
+    today = (today or datetime.date.today()).isoformat()
+    return sum(
+        int(s.get("PromptTokens", 0)) + int(s.get("CompletionTokens", 0))
+        for s in stats if s.get("Day") == today
+    )

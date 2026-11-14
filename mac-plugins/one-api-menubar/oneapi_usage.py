@@ -155,3 +155,30 @@ def bar(value, max_value, width=5):
         filled = int(round(value / max_value * width))
         filled = max(1, min(width, filled))
     return "█" * filled + "░" * (width - filled)
+
+
+import urllib.error
+import urllib.request
+
+
+def fetch_dashboard(base_url, access_token, timeout=15, urlopen=None):
+    if not base_url:
+        raise UsageError("base_url not configured")
+    url = base_url.rstrip("/") + "/api/user/dashboard"
+    req = urllib.request.Request(url, headers={
+        "Authorization": "Bearer " + access_token,
+        "Accept": "application/json",
+    })
+    opener = urlopen or urllib.request.urlopen
+    try:
+        resp = opener(req, timeout=timeout)
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            raise UsageError("auth_failed")
+        raise UsageError("http_{}".format(e.code))
+    except (urllib.error.URLError, OSError) as e:
+        raise NetworkError(str(e))
+    obj = json.loads(resp.read().decode("utf-8"))
+    if not obj.get("success"):
+        raise UsageError(obj.get("message") or "api_error")
+    return obj.get("data") or []

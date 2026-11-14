@@ -127,3 +127,43 @@ class FormatTest(unittest.TestCase):
         self.assertEqual(len(U.bar(3, 10, 5)), 5)
         self.assertEqual(U.bar(1, 100, 5)[:1], "█")   # nonzero gets >=1 block
         self.assertEqual(U.bar(5, 0, 5), "░░░░░")
+
+
+class _FakeResp:
+    def __init__(self, body): self._b = body.encode("utf-8")
+    def read(self): return self._b
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+
+
+class FetchTest(unittest.TestCase):
+    def test_success_returns_data_and_sends_bearer(self):
+        captured = {}
+        def fake_urlopen(req, timeout=None):
+            captured["url"] = req.full_url
+            captured["auth"] = req.get_header("Authorization")
+            return _FakeResp('{"success":true,"data":[{"Day":"2026-11-08"}]}')
+        data = U.fetch_dashboard("http://host/", "tok", urlopen=fake_urlopen)
+        self.assertEqual(captured["url"], "http://host/api/user/dashboard")
+        self.assertEqual(captured["auth"], "Bearer tok")
+        self.assertEqual(data, [{"Day": "2026-11-08"}])
+
+    def test_auth_error(self):
+        import urllib.error
+        def fake_urlopen(req, timeout=None):
+            raise urllib.error.HTTPError(req.full_url, 401, "no", {}, None)
+        with self.assertRaises(U.UsageError):
+            U.fetch_dashboard("http://host", "bad", urlopen=fake_urlopen)
+
+    def test_network_error(self):
+        import urllib.error
+        def fake_urlopen(req, timeout=None):
+            raise urllib.error.URLError("boom")
+        with self.assertRaises(U.NetworkError):
+            U.fetch_dashboard("http://host", "tok", urlopen=fake_urlopen)
+
+    def test_api_success_false(self):
+        def fake_urlopen(req, timeout=None):
+            return _FakeResp('{"success":false,"message":"nope"}')
+        with self.assertRaises(U.UsageError):
+            U.fetch_dashboard("http://host", "tok", urlopen=fake_urlopen)

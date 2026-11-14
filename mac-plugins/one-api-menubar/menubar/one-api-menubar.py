@@ -10,6 +10,9 @@ import rumps  # noqa: E402
 
 LAUNCH_LABEL = "com.oneapi.menubar"
 PROGRAM_PATH = os.path.abspath(__file__)
+# 在 py2app 打包后的 .app 里，__file__ 指向 Resources 里的脚本，不能直接作为
+# 可执行文件交给 launchd；此时改用 app 主二进制。
+LAUNCH_PROGRAM = sys.executable if getattr(sys, "frozen", False) else PROGRAM_PATH
 
 
 def launch_plist_path():
@@ -33,7 +36,7 @@ def set_login_item(enable):
             '<key>ProgramArguments</key><array><string>{}</string></array>'
             '<key>RunAtLoad</key><true/><key>KeepAlive</key><false/>'
             '</dict></plist>\n'
-        ).format(LAUNCH_LABEL, PROGRAM_PATH)
+        ).format(LAUNCH_LABEL, LAUNCH_PROGRAM)
         with open(path, "w", encoding="utf-8") as f:
             f.write(plist)
     elif os.path.exists(path):
@@ -156,15 +159,18 @@ class OneApiMenuBarApp(rumps.App):
                 items.append(rumps.separator)
             else:
                 action = e.get("action")
-                item = rumps.Item(e["title"],
-                                  callback=(None if e["disabled"] else self._make_handler(action)))
-                ns = getattr(item, "nsobject", None)
+                item = rumps.MenuItem(e["title"],
+                                      callback=(None if e["disabled"] else self._make_handler(action)))
+                ns = getattr(item, "_menuitem", None)
                 if ns is not None:
                     if e["disabled"]:
                         ns.setEnabled_(False)
                     if e.get("checked") is not None:
                         ns.setState_(1 if e["checked"] else 0)
                 items.append(item)
+        # rumps 的 Menu.update 以标题为 key 且忽略已存在的条目，直接赋值会让
+        # 标题变化的行（如刷新时间、每日用量）不断堆积，先清空再重建。
+        self.menu.clear()
         self.menu = items
 
     def _make_handler(self, action):
@@ -197,8 +203,7 @@ class OneApiMenuBarApp(rumps.App):
         elif action == "about":
             rumps.notification("one-api menubar", "v0.1.0", "one-api 用量菜单栏")
         elif action == "quit":
-            import sys as _s
-            _s.exit(0)
+            rumps.quit_application()
 
     def _redraw(self):
         stats = self._stats or []

@@ -182,3 +182,57 @@ def fetch_dashboard(base_url, access_token, timeout=15, urlopen=None):
     if not obj.get("success"):
         raise UsageError(obj.get("message") or "api_error")
     return obj.get("data") or []
+
+
+LABELS = {
+    "zh": {
+        "daily": "近7天用量", "model": "模型用量 (近7天)", "req": "次",
+        "refresh": "最近刷新", "total": "共", "tokens_word": "tokens",
+        "settings": "请配置 base_url 与 access_token",
+        "stale": "数据过时", "auth": "令牌无效，请检查 access_token",
+        "lang": "语言", "bar_mode": "菜单栏显示", "interval": "刷新间隔",
+        "bar_today": "今日", "bar_total": "7日总量",
+        "refresh_now": "立即刷新", "console": "打开 one-api 控制台",
+        "login": "开机自启", "about": "关于", "quit": "退出",
+        "interval_choices": [30, 60, 120],
+    },
+    "en": {
+        "daily": "Last 7 days", "model": "By model (last 7 days)", "req": "req",
+        "refresh": "Last refresh", "total": "total", "tokens_word": "tokens",
+        "settings": "Configure base_url and access_token",
+        "stale": "stale", "auth": "Invalid token, check access_token",
+        "lang": "Language", "bar_mode": "Menu bar shows", "interval": "Interval",
+        "bar_today": "Today", "bar_total": "7-day total",
+        "refresh_now": "Refresh now", "console": "Open one-api console",
+        "login": "Launch at login", "about": "About", "quit": "Quit",
+        "interval_choices": [30, 60, 120],
+    },
+}
+
+
+def daily_rows(daily, labels):
+    maxv = max((d.tokens for d in daily), default=0)
+    return ["{}  {}  {:>7}  {}{}".format(
+        d.day, bar(d.tokens, maxv, 5), format_tokens(d.tokens),
+        d.requests, labels["req"]) for d in daily]
+
+
+def model_rows(models, labels):
+    maxv = max((m.tokens for m in models), default=0)
+    return ["{:<18}{}  {:>7}  {:>3}%  {}{}".format(
+        m.name, bar(m.tokens, maxv, 5), format_tokens(m.tokens),
+        int(round(m.share * 100)), m.requests, labels["req"]) for m in models]
+
+
+def refresh_line(refresh_str, total, labels):
+    return "{} {} · {} {} {}".format(
+        labels["refresh"], refresh_str, labels["total"], format_tokens(total), labels["tokens_word"])
+
+
+def build_bar_title(daily, bar_mode, today):
+    if bar_mode == "total":
+        num = sum(d.tokens for d in daily)
+    else:
+        num = sum(d.tokens for d in daily if d.day == today)
+    spark = sparkline([d.tokens for d in daily], width=max(1, len(daily)))
+    return "⚡ {} {}".format(format_tokens(num), spark)

@@ -167,3 +167,39 @@ class FetchTest(unittest.TestCase):
             return _FakeResp('{"success":false,"message":"nope"}')
         with self.assertRaises(U.UsageError):
             U.fetch_dashboard("http://host", "tok", urlopen=fake_urlopen)
+
+
+class RowBuilderTest(unittest.TestCase):
+    def setUp(self):
+        self.zh = U.LABELS["zh"]
+        self.daily = [U.DayStat("2026-11-08", 300, 40),
+                      U.DayStat("2026-11-09", 0, 0),
+                      U.DayStat("2026-11-10", 600, 80)]
+        self.models = [U.ModelStat("gpt-4o", 600, 80, 0.6667),
+                       U.ModelStat("claude", 300, 40, 0.3333)]
+
+    def test_daily_rows_have_day_tokens_count_and_bar(self):
+        rows = U.daily_rows(self.daily, self.zh)
+        self.assertEqual(len(rows), 3)
+        self.assertIn("2026-11-08", rows[0])
+        self.assertIn("300", rows[0])
+        self.assertTrue(rows[0].endswith("40" + self.zh["req"]))
+        self.assertIn("░", rows[1])          # 0-token day shows empty bar
+
+    def test_model_rows_show_share_percent(self):
+        rows = U.model_rows(self.models, self.zh)
+        self.assertIn("gpt-4o", rows[0])
+        self.assertIn("67%", rows[0])        # round(0.6667*100)
+        self.assertIn("%", rows[1])
+
+    def test_refresh_line(self):
+        line = U.refresh_line("07:17", 900, self.zh)
+        self.assertIn("07:17", line)
+        self.assertIn("900", line)
+
+    def test_bar_title_today_and_total(self):
+        spark = U.sparkline([300, 0, 600], width=3)
+        self.assertEqual(U.build_bar_title(self.daily, "today", "2026-11-10"),
+                         "⚡ 600 " + spark)
+        self.assertEqual(U.build_bar_title(self.daily, "total", "2026-11-10"),
+                         "⚡ 900 " + spark)

@@ -168,6 +168,35 @@ class FetchTest(unittest.TestCase):
         with self.assertRaises(U.UsageError):
             U.fetch_dashboard("http://host", "tok", urlopen=fake_urlopen)
 
+    def test_gzip_response_is_decompressed(self):
+        import gzip
+        body = gzip.compress(b'{"success":true,"data":[{"Day":"2026-11-08"}]}')
+
+        class _GzipResp:
+            headers = {"Content-Encoding": "gzip"}
+
+            def read(self):
+                return body
+
+        def fake_urlopen(req, timeout=None):
+            return _GzipResp()
+
+        data = U.fetch_dashboard("http://host", "tok", urlopen=fake_urlopen)
+        self.assertEqual(data, [{"Day": "2026-11-08"}])
+
+    def test_gzip_without_header_is_decompressed_by_magic(self):
+        import gzip
+        body = gzip.compress(b'{"success":true,"data":[]}')
+
+        class _RawResp:
+            def read(self):
+                return body
+
+        def fake_urlopen(req, timeout=None):
+            return _RawResp()
+
+        self.assertEqual(U.fetch_dashboard("http://host", "tok", urlopen=fake_urlopen), [])
+
 
 class RowBuilderTest(unittest.TestCase):
     def setUp(self):
@@ -191,6 +220,25 @@ class RowBuilderTest(unittest.TestCase):
         self.assertIn("gpt-4o", rows[0])
         self.assertIn("67%", rows[0])        # round(0.6667*100)
         self.assertIn("%", rows[1])
+
+    def test_model_rows_truncate_long_names_to_fixed_width(self):
+        models = [U.ModelStat("qwen3.6-35b-a3b-ud-q4_k_xl-extra", 600, 3, 1.0)]
+        rows = U.model_rows(models, self.zh)
+        self.assertIn("…", rows[0])
+        self.assertNotIn("q4_k_xl-extra", rows[0])
+        # 名称列宽度固定为 20，后面紧跟柱状图
+        self.assertEqual(U.display_width(rows[0][:rows[0].index("█")]), 20)
+
+    def test_fit_name_pads_short_and_cjk_names(self):
+        self.assertEqual(U.fit_name("gpt-4o", 20), "gpt-4o" + " " * 14)
+        # 全角字符按 2 个宽度计算
+        self.assertEqual(U.fit_name("中文模型", 20), "中文模型" + " " * 12)
+        self.assertEqual(U.display_width(U.fit_name("x" * 40, 20)), 20)
+
+    def test_daily_rows_align_request_column(self):
+        rows = U.daily_rows(self.daily, self.zh)
+        self.assertTrue(rows[0].endswith("   40" + self.zh["req"]))
+        self.assertTrue(rows[2].endswith("   80" + self.zh["req"]))
 
     def test_refresh_line(self):
         line = U.refresh_line("07:17", 900, self.zh)

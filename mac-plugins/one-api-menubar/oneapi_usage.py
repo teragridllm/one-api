@@ -1,5 +1,8 @@
+import gzip
 import json
 import os
+import unicodedata
+import zlib
 
 CONFIG_PATH = os.path.expanduser("~/.one-api-menubar.json")
 CACHE_PATH = os.path.expanduser("~/.one-api-menubar-cache.json")
@@ -134,6 +137,29 @@ def format_tokens(n):
     return str(n)
 
 
+def display_width(text):
+    """字符串在菜单里的显示宽度（CJK 全角字符按 2 计）。"""
+    width = 0
+    for ch in str(text):
+        if unicodedata.combining(ch):
+            continue
+        width += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+    return width
+
+
+def fit_name(name, width=20):
+    """把模型名截断/补齐到固定显示宽度，避免长名字与柱状图粘连。"""
+    name = str(name)
+    if display_width(name) > width:
+        kept = ""
+        for ch in name:
+            if display_width(kept + ch) > width - 1:
+                break
+            kept += ch
+        name = kept + "…"
+    return name + " " * max(0, width - display_width(name))
+
+
 def sparkline(values, width=7):
     values = list(values)[:width]
     top = max(values) if values else 0
@@ -161,6 +187,26 @@ import urllib.error
 import urllib.request
 
 
+def _read_body(resp):
+    """读取响应体，按 Content-Encoding 或魔数解压（部分网关无条件 gzip）。"""
+    body = resp.read()
+    headers = getattr(resp, "headers", None)
+    encoding = ""
+    if headers is not None:
+        try:
+            encoding = (headers.get("Content-Encoding") or "").lower()
+        except AttributeError:
+            encoding = ""
+    if encoding == "gzip" or body[:2] == b"\x1f\x8b":
+        return gzip.decompress(body)
+    if encoding == "deflate":
+        try:
+            return zlib.decompress(body)
+        except zlib.error:
+            return zlib.decompress(body, -zlib.MAX_WBITS)
+    return body
+
+
 def fetch_dashboard(base_url, access_token, timeout=15, urlopen=None):
     if not base_url:
         raise UsageError("base_url not configured")
@@ -168,6 +214,7 @@ def fetch_dashboard(base_url, access_token, timeout=15, urlopen=None):
     req = urllib.request.Request(url, headers={
         "Authorization": "Bearer " + access_token,
         "Accept": "application/json",
+        "Accept-Encoding": "gzip",
     })
     opener = urlopen or urllib.request.urlopen
     try:
@@ -178,7 +225,7 @@ def fetch_dashboard(base_url, access_token, timeout=15, urlopen=None):
         raise UsageError("http_{}".format(e.code))
     except (urllib.error.URLError, OSError) as e:
         raise NetworkError(str(e))
-    obj = json.loads(resp.read().decode("utf-8"))
+    obj = json.loads(_read_body(resp).decode("utf-8"))
     if not obj.get("success"):
         raise UsageError(obj.get("message") or "api_error")
     return obj.get("data") or []
@@ -212,15 +259,15 @@ LABELS = {
 
 def daily_rows(daily, labels):
     maxv = max((d.tokens for d in daily), default=0)
-    return ["{}  {}  {:>7}  {}{}".format(
+    return ["{}  {}  {:>7}  {:>5}{}".format(
         d.day, bar(d.tokens, maxv, 5), format_tokens(d.tokens),
         d.requests, labels["req"]) for d in daily]
 
 
 def model_rows(models, labels):
     maxv = max((m.tokens for m in models), default=0)
-    return ["{:<18}{}  {:>7}  {:>3}%  {}{}".format(
-        m.name, bar(m.tokens, maxv, 5), format_tokens(m.tokens),
+    return ["{}{}  {:>7}  {:>3}%  {:>5}{}".format(
+        fit_name(m.name, 20), bar(m.tokens, maxv, 5), format_tokens(m.tokens),
         int(round(m.share * 100)), m.requests, labels["req"]) for m in models]
 
 

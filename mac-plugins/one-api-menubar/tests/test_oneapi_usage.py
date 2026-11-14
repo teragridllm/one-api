@@ -84,3 +84,21 @@ class DayAggregateTest(unittest.TestCase):
         stats = [_stat("2026-11-14", "a", 10, 5, 1), _stat("2026-11-13", "a", 7, 3, 2)]
         self.assertEqual(U.total_tokens(stats), 25)
         self.assertEqual(U.today_total(stats, today=datetime.date(2026, 11, 14)), 15)
+
+
+class ModelAggregateTest(unittest.TestCase):
+    def test_groups_sorts_and_share(self):
+        stats = [_stat("2026-11-08", "gpt-4o", 100, 100, 3),
+                 _stat("2026-11-09", "gpt-4o", 0, 200, 1),
+                 _stat("2026-11-09", "claude", 50, 50, 2)]
+        models = U.aggregate_by_model(stats)
+        self.assertEqual([m.name for m in models], ["gpt-4o", "claude"])  # desc tokens
+        self.assertEqual(models[0].tokens, 400)
+        self.assertEqual(models[0].requests, 4)
+        self.assertEqual(models[1].tokens, 100)
+        self.assertAlmostEqual(models[0].share, 400 / 500, places=6)
+        self.assertAlmostEqual(models[1].share, 100 / 500, places=6)
+
+    def test_zero_total_share(self):
+        models = U.aggregate_by_model([_stat("2026-11-08", "m", 0, 0, 1)])
+        self.assertEqual(models[0].share, 0.0)

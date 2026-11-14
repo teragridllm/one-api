@@ -101,3 +101,25 @@ def today_total(stats, today=None):
         int(s.get("PromptTokens", 0)) + int(s.get("CompletionTokens", 0))
         for s in stats if s.get("Day") == today
     )
+
+
+@dataclass
+class ModelStat:
+    name: str
+    tokens: int
+    requests: int
+    share: float
+
+
+def aggregate_by_model(stats):
+    tokens = {}
+    reqs = {}
+    for s in stats:
+        name = s.get("ModelName") or "(unknown)"
+        tokens[name] = tokens.get(name, 0) + int(s.get("PromptTokens", 0)) + int(s.get("CompletionTokens", 0))
+        reqs[name] = reqs.get(name, 0) + int(s.get("RequestCount", 0))
+    total = sum(tokens.values())
+    models = [ModelStat(name, tok, reqs[name], (tok / total) if total else 0.0)
+              for name, tok in tokens.items()]
+    models.sort(key=lambda m: (-m.tokens, m.name))
+    return models

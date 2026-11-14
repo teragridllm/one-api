@@ -123,3 +123,35 @@ def aggregate_by_model(stats):
               for name, tok in tokens.items()]
     models.sort(key=lambda m: (-m.tokens, m.name))
     return models
+
+
+def format_tokens(n):
+    n = int(n)
+    if n >= 1_000_000:
+        return "{:.1f}M".format(n / 1_000_000)
+    if n >= 1000:
+        return "{:.1f}k".format(n / 1000)
+    return str(n)
+
+
+def sparkline(values, width=7):
+    values = list(values)[:width]
+    top = max(values) if values else 0
+    if top <= 0:
+        return SPARK_CHARS[0] * len(values)
+    out = []
+    last = len(SPARK_CHARS) - 1
+    for v in values:
+        idx = max(0, min(last, int(round(v / top * last))))
+        out.append(SPARK_CHARS[idx])
+    return "".join(out)
+
+
+def bar(value, max_value, width=5):
+    value = int(value)
+    if max_value <= 0 or value <= 0:
+        filled = 0
+    else:
+        filled = int(round(value / max_value * width))
+        filled = max(1, min(width, filled))
+    return "█" * filled + "░" * (width - filled)

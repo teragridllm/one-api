@@ -482,7 +482,7 @@ def sparkline(values, width=7):
 def bar(value, max_value, width=5):
     value = int(value)
     if max_value <= 0 or value <= 0:
-        filled = 0 if value <= 0 else width
+        filled = 0
     else:
         filled = int(round(value / max_value * width))
         filled = max(1, min(width, filled))
@@ -1080,17 +1080,21 @@ class OneApiMenuBarApp(rumps.App):
             if e["sep"]:
                 items.append(rumps.separator)
             else:
-                item = rumps.Item(e["title"], key=e.get("action") or None)
-                item.set_enabled_(not e["disabled"]) if hasattr(item, "set_enabled_") else None
-                if e.get("checked") is not None:
-                    item.set_state_(1 if e["checked"] else 0) if hasattr(item, "set_state_") else None
+                action = e.get("action")
+                item = rumps.Item(e["title"],
+                                  callback=(None if e["disabled"] else self._make_handler(action)))
+                ns = getattr(item, "nsobject", None)
+                if ns is not None:
+                    if e["disabled"]:
+                        ns.setEnabled_(False)
+                    if e.get("checked") is not None:
+                        ns.setState_(1 if e["checked"] else 0)
                 items.append(item)
         self.menu = items
 
     # --- actions ---
-    @rumps.clicked("refresh_now")
-    def _click(self, sender):
-        self._dispatch(getattr(sender, "key", None))
+    def _make_handler(self, action):
+        return lambda sender: self._dispatch(action)
 
     def _dispatch(self, action):
         if not action:
@@ -1130,7 +1134,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `python3 -m unittest tests.test_app -v`
-Expected: PASS (all MenuEntriesTest). Note `set_enabled_`/`set_state_` are guarded by `hasattr` so the stub `rumps.Item` (`object`) does not break `menu_entries` tests (which never call `_render`).
+Expected: PASS (all MenuEntriesTest). Note menu-building uses `getattr(item, "nsobject", None)` guarded so the stub `rumps.Item` (`object`) never breaks tests; `menu_entries` tests never call `_render` anyway.
 
 - [ ] **Step 5: Commit**
 

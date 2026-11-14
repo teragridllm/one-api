@@ -102,3 +102,28 @@ class ModelAggregateTest(unittest.TestCase):
     def test_zero_total_share(self):
         models = U.aggregate_by_model([_stat("2026-11-08", "m", 0, 0, 1)])
         self.assertEqual(models[0].share, 0.0)
+
+
+class FormatTest(unittest.TestCase):
+    def test_format_tokens(self):
+        self.assertEqual(U.format_tokens(999), "999")
+        self.assertEqual(U.format_tokens(1500), "1.5k")
+        self.assertEqual(U.format_tokens(3_200_000), "3.2M")
+        self.assertEqual(U.format_tokens(0), "0")
+
+    def test_sparkline_scales_to_max(self):
+        spark = U.sparkline([0, 5, 10], width=3)
+        self.assertEqual(spark, U.SPARK_CHARS[0] + U.SPARK_CHARS[4] + U.SPARK_CHARS[7])
+
+    def test_sparkline_all_zero(self):
+        self.assertEqual(U.sparkline([0, 0, 0], width=3), U.SPARK_CHARS[0] * 3)
+
+    def test_sparkline_width_matches_values(self):
+        self.assertEqual(len(U.sparkline([1, 2, 3, 4, 5, 6, 7])), 7)
+
+    def test_bar_scaling(self):
+        self.assertEqual(U.bar(10, 10, 5), "█████")
+        self.assertEqual(U.bar(0, 10, 5), "░░░░░")
+        self.assertEqual(len(U.bar(3, 10, 5)), 5)
+        self.assertEqual(U.bar(1, 100, 5)[:1], "█")   # nonzero gets >=1 block
+        self.assertEqual(U.bar(5, 0, 5), "░░░░░")

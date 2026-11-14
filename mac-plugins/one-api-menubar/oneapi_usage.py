@@ -236,3 +236,24 @@ def build_bar_title(daily, bar_mode, today):
         num = sum(d.tokens for d in daily if d.day == today)
     spark = sparkline([d.tokens for d in daily], width=max(1, len(daily)))
     return "⚡ {} {}".format(format_tokens(num), spark)
+
+
+import time
+
+
+def save_cache(data, path=CACHE_PATH, now=None):
+    now = time.time() if now is None else now
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"ts": now, "data": data}, f, ensure_ascii=False)
+
+
+def load_cache(path=CACHE_PATH, now=None, ttl=55):
+    now = time.time() if now is None else now
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            obj = json.load(f)
+    except (FileNotFoundError, ValueError):
+        return None, False
+    data = obj.get("data")
+    ts = obj.get("ts", 0)
+    return data, (now - ts) <= ttl

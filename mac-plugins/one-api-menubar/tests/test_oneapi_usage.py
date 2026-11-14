@@ -203,3 +203,26 @@ class RowBuilderTest(unittest.TestCase):
                          "⚡ 600 " + spark)
         self.assertEqual(U.build_bar_title(self.daily, "total", "2026-11-10"),
                          "⚡ 900 " + spark)
+
+
+class CacheTest(unittest.TestCase):
+    def test_save_then_fresh_load(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "c.json")
+            U.save_cache([{"Day": "2026-11-08"}], path=p, now=1000.0)
+            data, fresh = U.load_cache(path=p, now=1040.0, ttl=55)
+            self.assertTrue(fresh)
+            self.assertEqual(data, [{"Day": "2026-11-08"}])
+
+    def test_stale_after_ttl(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "c.json")
+            U.save_cache([{"Day": "2026-11-08"}], path=p, now=1000.0)
+            data, fresh = U.load_cache(path=p, now=1060.0, ttl=55)
+            self.assertFalse(fresh)
+            self.assertEqual(data, [{"Day": "2026-11-08"}])  # data still returned
+
+    def test_missing_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "nope.json")
+            self.assertEqual(U.load_cache(path=p), (None, False))

@@ -2,6 +2,7 @@ import os
 import sys
 import types
 import unittest
+from unittest import mock
 
 # Stub rumps + AppKit BEFORE importing the app module.
 _rumps = types.ModuleType("rumps")
@@ -57,3 +58,58 @@ class MenuEntriesTest(unittest.TestCase):
     def test_auth_error_shows_auth_row(self):
         entries = app_mod.menu_entries(self.daily, self.models, self.cfg, "07:17", 900, error="auth")
         self.assertTrue(any("access_token" in x for x in self.titles(entries)))
+
+
+class FetchFallbackTest(unittest.TestCase):
+    CFG = {"lang": "zh", "bar_mode": "today", "base_url": "http://h",
+           "access_token": "t", "refresh_sec": 60}
+
+    def make_app(self):
+        with mock.patch.object(app_mod.U, "load_config", return_value=dict(self.CFG)):
+            return app_mod.OneApiMenuBarApp()
+
+    def test_force_fetch_bypasses_fresh_cache(self):
+        app = self.make_app()
+        app._stats = [{"Day": "2026-11-10"}]
+        with mock.patch.object(app_mod.U, "load_cache", return_value=(["cached"], True)), \
+                mock.patch.object(app_mod.U, "fetch_dashboard", return_value=["fresh"]) as fetch, \
+                mock.patch.object(app_mod.U, "save_cache") as save:
+            app._fetch()
+            fetch.assert_not_called()
+            app._fetch(force=True)
+            fetch.assert_called_once()
+            save.assert_called_once_with(["fresh"])
+        self.assertEqual(app._pending["stats"], ["fresh"])
+        self.assertIsNone(app._pending["error"])
+
+    def test_failed_refresh_falls_back_to_last_stats(self):
+        app = self.make_app()
+        app._stats = [{"Day": "2026-11-10"}]
+        with mock.patch.object(app_mod.U, "load_cache", return_value=(None, False)), \
+                mock.patch.object(app_mod.U, "fetch_dashboard",
+                                  side_effect=app_mod.U.UsageError("auth_failed")):
+            app._fetch(force=True)
+        self.assertEqual(app._pending["stats"], app._stats)
+        self.assertEqual(app._pending["error"], "auth")
+
+    def test_failed_refresh_prefers_cache_over_last_stats(self):
+        app = self.make_app()
+        app._stats = [{"Day": "2026-11-10"}]
+        with mock.patch.object(app_mod.U, "load_cache", return_value=(["cached"], False)), \
+                mock.patch.object(app_mod.U, "fetch_dashboard",
+                                  side_effect=app_mod.U.NetworkError("offline")):
+            app._fetch(force=True)
+        self.assertEqual(app._pending["stats"], ["cached"])
+        self.assertEqual(app._pending["error"], "stale")
+
+    def test_refresh_now_reloads_config_and_keeps_cache(self):
+        app = self.make_app()
+        new_cfg = dict(self.CFG, access_token="new-token")
+        app._kick_fetch = mock.Mock()
+        with mock.patch.object(app_mod.U, "load_config", return_value=new_cfg), \
+                mock.patch.object(app_mod.os, "remove") as remove:
+            app._dispatch("refresh_now")
+        remove.assert_not_called()
+        self.assertEqual(app.config["access_token"], "new-token")
+        app._kick_fetch.assert_called_once_with(force=True)
+

@@ -99,7 +99,8 @@ claude-3-5-sonnet ██    2.9M  16%  320次
 ## 6. 配置与状态文件
 
 - 配置 `~/.one-api-menubar.json`：`base_url`、`access_token`、`refresh_sec`(默认60/最小30)、`lang`(`zh|en`，默认zh)、`bar_mode`(`today|total`)。缺 `base_url`/`access_token` 时菜单显示「请配置 one-api 地址与令牌」行。
-- 缓存 `~/.one-api-menubar-cache.json`：缓存上次成功响应 + 时间戳，TTL 55s；「立即刷新」删除缓存并强制请求。
+- 缓存 `~/.one-api-menubar-cache.json`：缓存上次成功响应 + 时间戳，TTL 55s；「立即刷新」强制请求并绕过 TTL，但不预先删除缓存，请求失败时回退到缓存/上次成功数据。
+- 配置在每次轮询（5s）和「立即刷新」时重新读取，修改 `~/.one-api-menubar.json` 后无需重启应用。
 - 自启：写/删 `~/Library/LaunchAgents/com.oneapi.menubar.plist`（`RunAtLoad=true`，`KeepAlive=false`），勾选态 = plist 是否存在。
 - 模板文件 `one-api-menubar.example.json` 供参考。
 

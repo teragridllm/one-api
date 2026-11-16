@@ -108,24 +108,29 @@ class OneApiMenuBarApp(rumps.App):
         if not force and (now - self._last_fetch_ts) < interval:
             return
         self._last_fetch_ts = now
-        threading.Thread(target=self._fetch, daemon=True).start()
+        threading.Thread(target=self._fetch, args=(force,), daemon=True).start()
 
-    def _fetch(self):
+    def _fallback_stats(self, cached):
+        # 请求失败时优先用缓存，其次用内存里上一次成功的数据，避免菜单突然变空。
+        if cached is not None:
+            return cached
+        return self._stats if self._stats is not None else []
+
+    def _fetch(self, force=False):
         cached, fresh = U.load_cache(ttl=55)
-        if cached is not None and fresh and self._stats is not None:
+        if not force and cached is not None and fresh and self._stats is not None:
             return
         if not (self.config.get("base_url") and self.config.get("access_token")):
-            if cached is not None:
-                self._store(cached, error="stale")
+            self._store(self._fallback_stats(cached), error="stale")
             return
         try:
             stats = U.fetch_dashboard(self.config["base_url"], self.config["access_token"])
             U.save_cache(stats)
             self._store(stats, error=None)
         except U.UsageError:
-            self._store(cached if cached is not None else [], error="auth")
+            self._store(self._fallback_stats(cached), error="auth")
         except U.NetworkError:
-            self._store(cached if cached is not None else [], error="stale")
+            self._store(self._fallback_stats(cached), error="stale")
 
     def _store(self, stats, error):
         with self._lock:
@@ -133,6 +138,8 @@ class OneApiMenuBarApp(rumps.App):
 
     @rumps.timer(5)
     def _poll(self, _):
+        # 重新读取配置，让用户改完 ~/.one-api-menubar.json 里的令牌/地址后无需重启。
+        self.config = U.load_config()
         self._kick_fetch()
 
     @rumps.timer(1)
@@ -180,10 +187,8 @@ class OneApiMenuBarApp(rumps.App):
         if not action:
             return
         if action == "refresh_now":
-            try:
-                os.remove(U.CACHE_PATH)
-            except OSError:
-                pass
+            # 只强制请求，不预先删缓存：请求失败时仍能回退到上次成功的数据。
+            self.config = U.load_config()
             self._kick_fetch(force=True)
         elif action == "toggle_lang":
             self.config["lang"] = "en" if self.config.get("lang") == "zh" else "zh"

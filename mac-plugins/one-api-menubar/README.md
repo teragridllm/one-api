@@ -11,6 +11,7 @@ access_token 来自 one-api「个人设置」的 32 位令牌。仅显示该账�
 
 ## 安装配置（macOS）
 1. 复制 `one-api-menubar.example.json` 到 `~/.one-api-menubar.json`，填入 `base_url` 与 `access_token`。
+   修改配置后应用会在 5s 内自动重新读取，也可点「立即刷新」立即生效，无需重启。
 2. 安装依赖（仅 macOS，建议 Homebrew Python）：`pip3 install rumps py2app`
 
 ## 运行（开发）

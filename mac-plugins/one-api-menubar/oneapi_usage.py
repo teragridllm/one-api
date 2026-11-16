@@ -1,6 +1,7 @@
 import gzip
 import json
 import os
+import ssl
 import unicodedata
 import zlib
 
@@ -207,6 +208,17 @@ def _read_body(resp):
     return body
 
 
+def _urlopen_with_ssl(req, timeout=None):
+    context = None
+    if not ssl.get_default_verify_paths().cafile:
+        try:
+            import certifi
+            context = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            pass
+    return urllib.request.urlopen(req, timeout=timeout, context=context)
+
+
 def fetch_dashboard(base_url, access_token, timeout=15, urlopen=None):
     if not base_url:
         raise UsageError("base_url not configured")
@@ -216,7 +228,7 @@ def fetch_dashboard(base_url, access_token, timeout=15, urlopen=None):
         "Accept": "application/json",
         "Accept-Encoding": "gzip",
     })
-    opener = urlopen or urllib.request.urlopen
+    opener = urlopen or _urlopen_with_ssl
     try:
         resp = opener(req, timeout=timeout)
     except urllib.error.HTTPError as e:

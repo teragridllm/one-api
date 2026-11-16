@@ -1,0 +1,7 @@
+{
+  "base_url": "https://your-one-api.example.com",
+  "access_token": "your 32-char access_token from one-api personal settings",
+  "refresh_sec": 60,
+  "lang": "zh",
+  "bar_mode": "today"
+}
